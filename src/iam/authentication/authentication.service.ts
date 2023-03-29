@@ -1,3 +1,4 @@
+import { ActiveUserData } from './../interfaces/active-user-data.interface';
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -54,7 +55,7 @@ export class AuthenticationService {
             {
                 sub: user.id,
                 email: user.email,
-            },
+            } as ActiveUserData,
             {
                 audience: this.jwtConfiguration.audience,
                 issuer: this.jwtConfiguration.issuer,
