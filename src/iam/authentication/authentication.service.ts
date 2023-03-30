@@ -15,6 +15,8 @@ import jwtConfig from '../config/jwt.config';
 import { HashingService } from '../hashing/hashing.service';
 import { SignInDto } from './dto/sign-in.dto';
 import { SignUpDto } from './dto/sign-up.dto';
+import { InvalidatedRefreshTokenError, RefreshTokenIdsStorage } from './refresh-token-ids.storage';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AuthenticationService {
@@ -24,6 +26,7 @@ export class AuthenticationService {
         private readonly jwtService: JwtService,
         @Inject(jwtConfig.KEY)
         private readonly jwtConfiguration: ConfigType<typeof jwtConfig>,
+        private readonly refreshTokenIdsStorage: RefreshTokenIdsStorage,
     ) { }
 
     async signUp(signUpDto: SignUpDto) {
@@ -61,15 +64,18 @@ export class AuthenticationService {
     }
 
     async generateTokens(user: User) {
+        const refreshTokenId = randomUUID();
         const [accessToken, refreshToken] = await Promise.all([
             this.signToken<Partial<ActiveUserData>>(
                 user.id,
                 this.jwtConfiguration.accessTokenTtl,
                 { email: user.email },
             ),
-            this.signToken(user.id, this.jwtConfiguration.refreshTokenTtl),
+            this.signToken(user.id, this.jwtConfiguration.refreshTokenTtl, {
+                refreshTokenId,
+            }),
         ]);
-
+        await this.refreshTokenIdsStorage.insert(user.id, refreshTokenId);
         return {
             accessToken,
             refreshToken,
@@ -78,8 +84,8 @@ export class AuthenticationService {
 
     async refreshToken(refreshTokenDto: RefreshTokenDto) {
         try {
-            const { sub } = await this.jwtService.verifyAsync<
-                Pick<ActiveUserData, 'sub'>
+            const { sub, refreshTokenId } = await this.jwtService.verifyAsync<
+                Pick<ActiveUserData, 'sub'> & { refreshTokenId: string }
             >(refreshTokenDto.refreshToken, {
                 secret: this.jwtConfiguration.secret,
                 audience: this.jwtConfiguration.audience,
@@ -90,8 +96,23 @@ export class AuthenticationService {
                 id: sub,
             });
 
+            const isValid = await this.refreshTokenIdsStorage.validate(
+                user.id,
+                refreshTokenId,
+            );
+
+            if (isValid) {
+                await this.refreshTokenIdsStorage.invalidate(user.id);
+            } else {
+                throw new Error('Refresh token is invalid');
+            }
+
             return this.generateTokens(user);
         } catch (error) {
+            if (error instanceof InvalidatedRefreshTokenError) {
+                // Take action: notify user that his refresh token might have been stolen?
+                throw new UnauthorizedException('Access denied');
+            }
             throw new UnauthorizedException();
         }
     }
