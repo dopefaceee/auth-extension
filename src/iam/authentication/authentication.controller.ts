@@ -1,3 +1,4 @@
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { AuthenticationService } from './authentication.service';
 import { Auth } from './decorators/auth.decorator';
@@ -19,5 +20,11 @@ export class AuthenticationController {
     @Post('sign-in')
     signIn(@Body() signInDto: SignInDto) {
         return this.authService.signIn(signInDto);
+    }
+
+    @HttpCode(HttpStatus.OK)
+    @Post('refresh-tokens')
+    refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
+        return this.authService.refreshToken(refreshTokenDto)
     }
 }
