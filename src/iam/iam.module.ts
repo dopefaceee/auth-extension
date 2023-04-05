@@ -1,3 +1,4 @@
+import { PermissionsGuard } from './authorization/guards/permissions.guard';
 import { AuthenticationGuard } from './authentication/guards/authentication.guard';
 import { AccessTokenGuard } from './authentication/guards/access-token/access-token.guard';
 import { User } from './../users/entities/user.entity';
@@ -31,7 +32,7 @@ import { RolesGuard } from './authorization/guards/roles.guard';
     },
     {
       provide: APP_GUARD,
-      useClass: RolesGuard,
+      useClass: PermissionsGuard, //RolesGuard,
     },
     AccessTokenGuard,
     AuthenticationService,
